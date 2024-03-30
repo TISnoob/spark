@@ -1,55 +1,49 @@
 plugins {
-    id 'org.cadixdev.licenser' version '0.6.1' apply false
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-allprojects {
-    group = 'me.lucko'
-    version = '1.10-SNAPSHOT'
+dependencies {
+    implementation project(':spark-common')
+    implementation 'net.kyori:adventure-text-serializer-legacy:4.14.0'
+    compileOnly 'org.geysermc.geyser:api:2.2.0-SNAPSHOT'
+    // TODO Remove
+    compileOnly('org.geysermc.geyser:core:2.2.0-SNAPSHOT') {
+        exclude group: 'io.netty'
+    }
 }
 
-subprojects {
-    apply plugin: 'java'
-    apply plugin: 'idea'
-    apply plugin: 'java-library'
-    apply plugin: 'org.cadixdev.licenser'
-
-    ext {
-        baseVersion = '1.10'
-        patchVersion = determinePatchVersion()
-        pluginVersion = baseVersion + '.' + patchVersion
-        pluginDescription = 'spark is a performance profiling plugin/mod for Minecraft clients, servers and proxies.'
-    }
-
-    tasks.withType(JavaCompile) {
-        options.encoding = 'UTF-8'
-        options.release = 8
-    }
-
-    processResources {
-        duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    }
-
-    license {
-        header = rootProject.file('HEADER.txt')
-        include '**/*.java'
-    }
-
-    repositories {
-        mavenCentral()
-        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
-        maven { url "https://repo.lucko.me/" }
-        maven { url "https://jitpack.io" }
-    }
-
+repositories {
+    maven { url 'https://repo.opencollab.dev/main/' }
 }
 
-def determinePatchVersion() {
-    def tagInfo = new ByteArrayOutputStream()
-    exec {
-        commandLine 'git', 'describe', '--tags'
-        standardOutput = tagInfo
+processResources {
+    from(sourceSets.main.resources.srcDirs) {
+        expand (
+                'pluginVersion': project.pluginVersion,
+                'pluginDescription': project.pluginDescription
+        )
+        include 'extension.yml'
     }
-    tagInfo = tagInfo.toString()
+}
 
-    return tagInfo.contains('-') ? tagInfo.split("-")[1] : 0
+shadowJar {
+    archiveFileName = "spark-${project.pluginVersion}-geyser.jar"
+
+    relocate 'net.kyori.adventure', 'me.lucko.spark.lib.adventure'
+    relocate 'net.kyori.examination', 'me.lucko.spark.lib.adventure.examination'
+    relocate 'net.bytebuddy', 'me.lucko.spark.lib.bytebuddy'
+    relocate 'com.google.protobuf', 'me.lucko.spark.lib.protobuf'
+    relocate 'org.objectweb.asm', 'me.lucko.spark.lib.asm'
+    relocate 'one.profiler', 'me.lucko.spark.lib.asyncprofiler'
+    relocate 'me.lucko.bytesocks.client', 'me.lucko.spark.lib.bytesocks'
+    relocate 'org.java_websocket', 'me.lucko.spark.lib.bytesocks.ws'
+
+    exclude 'module-info.class'
+    exclude 'META-INF/maven/**'
+    exclude 'META-INF/proguard/**'
+}
+
+artifacts {
+    archives shadowJar
+    shadow shadowJar
 }
